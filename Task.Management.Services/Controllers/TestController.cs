@@ -1,42 +1,25 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
+using Swashbuckle.AspNetCore.Annotations;
 
-namespace Task.Management.API.Controllers
+namespace Task.Management.Services.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
-    public class TestController : ControllerBase
+    [Route("api/[controller]")]
+    public class TestController(IConfiguration configuration) : ControllerBase
     {
-        private readonly ILogger<TestController> _logger;
+        private readonly IConfiguration _configuration = configuration;
 
-        public TestController(ILogger<TestController> logger)
-        {
-            _logger = logger;
-        }
-
-        [HttpGet("AuthorizedEndpoint")]
+        [HttpGet("GetTest")]
+        [Produces("application/json")]
+        [SwaggerResponse(StatusCodes.Status401Unauthorized)]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public ActionResult<string> GetAuthorizedData()
+        public IActionResult GetTest()
         {
-            try
-            {
-                return Ok("You are authorized to access this endpoint!");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while accessing the authorized endpoint.");
-                return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
-            }
-        }
-
-        [HttpGet("TestAuth")]
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public IActionResult TestAuth()
-        {
+            string bearerToken = Request.Headers[HeaderNames.Authorization].ToString();
             return Ok(new { message = "Authorization is working!" });
         }
-
     }
 }

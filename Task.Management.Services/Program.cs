@@ -1,4 +1,4 @@
-using CRM.Equitec.API.Services;
+using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,8 +9,9 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Task.Management.Services;
-using Task.Management.Services.Repositories;
+using Task.Management.Services.Models;
+using Task.Management.Services.Services;
+
 
 Assembly assembly = Assembly.GetExecutingAssembly();
 FileVersionInfo fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
@@ -18,6 +19,7 @@ FileVersionInfo fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Locati
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
+
 
 builder.Services.AddCors(config => config.AddDefaultPolicy(options =>
 {
@@ -35,6 +37,11 @@ builder.Services.AddMvc().AddJsonOptions(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHealthChecks();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("EndPointRateLimiting"));
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
 builder.Services.AddScoped<AuthenticateRepository>();
 builder.Services.AddDbContext<TaskManagementDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -47,7 +54,6 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.IncludeErrorDetails = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -55,10 +61,9 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidAudience = builder.Configuration["Jwt:Issuer"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
-    options.TokenValidationParameters.ClockSkew = TimeSpan.FromMinutes(5);
 });
 
 builder.Services.AddSwaggerGen(config =>
@@ -66,10 +71,15 @@ builder.Services.AddSwaggerGen(config =>
     config.SwaggerDoc(fileVersionInfo.FileVersion, new OpenApiInfo
     {
         Version = fileVersionInfo.ProductVersion,
-        Title = "Task Management API",
-        Description = "This is a private API for task management."
+        Title = "CRM Mobile Data Access API",
+        Description = $"This is Equitec restful **private API** catering CRM data",
+        Contact = new OpenApiContact
+        {
+            Name = "Equitec Software Technology",
+            Email = "support@equitec.in",
+            Url = new Uri("https://equitec.in/#contact")
+        }
     });
-
     config.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
     {
         Description = $@"Standard Authorization header using the {JwtBearerDefaults.AuthenticationScheme} scheme. Example: ""Bearer {{token}}""",
@@ -81,26 +91,10 @@ builder.Services.AddSwaggerGen(config =>
     });
     config.OperationFilter<AuthHeaderOperationFilter>();
     config.DocumentFilter<CustomDocumentFilter>();
-    config.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = JwtBearerDefaults.AuthenticationScheme
-                }
-            },
-            new string[] {}
-        }
-    });
-
     config.EnableAnnotations();
 });
 
 var app = builder.Build();
-
 app.MapHealthChecks("/HealthCheck");
 app.UseSwagger();
 app.UseSwaggerUI(config =>
@@ -108,11 +102,10 @@ app.UseSwaggerUI(config =>
     config.SwaggerEndpoint($"./{fileVersionInfo.FileVersion}/swagger.json", $"Version — {fileVersionInfo.FileVersion}");
     config.EnableFilter();
 });
-
 app.UseForwardedHeaders();
+app.UseIpRateLimiting();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
 app.Run();

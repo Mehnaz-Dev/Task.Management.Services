@@ -1,7 +1,7 @@
 ﻿using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace CRM.Equitec.API.Services
+namespace Task.Management.Services.Services
 {
     public class CustomDocumentFilter : IDocumentFilter
     {
