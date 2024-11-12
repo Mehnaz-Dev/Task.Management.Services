@@ -71,8 +71,8 @@ builder.Services.AddSwaggerGen(config =>
     config.SwaggerDoc(fileVersionInfo.FileVersion, new OpenApiInfo
     {
         Version = fileVersionInfo.ProductVersion,
-        Title = "CRM Mobile Data Access API",
-        Description = $"This is Equitec restful **private API** catering CRM data",
+        Title = "Task Management Data Access API",
+        Description = $"This is TaskManagement restful **private API** catering Task Management data",
         Contact = new OpenApiContact
         {
             Name = "Equitec Software Technology",

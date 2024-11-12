@@ -9,6 +9,9 @@
         public string? LastName { get; set; }
         public string? Email { get; set; }
         public string? Phone { get; set; }
-        public long RoleId { get; set; }
+        public string? Otp { get; set; }
+        public DateTime? OtpExpiry { get; set; }
+        public DateTime? OtpSentAt { get; set; }
+        public long? RoleId { get; set; }
     }
 }

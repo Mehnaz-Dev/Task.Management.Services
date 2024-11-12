@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
+using Task.Management.Services.Models;
 using Task.Management.Services.Models.Auth;
 
 namespace Task.Management.Services.Controllers
@@ -49,6 +51,48 @@ namespace Task.Management.Services.Controllers
                 _logger.LogError(ex, "An error occurred during login for user: {UserName}", user?.UserName);
                 return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
             }
+        }
+        [HttpPost("ForgotPassword")]
+        public ActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Email))
+                return BadRequest("Email is required.");
+
+            var otp = _authenticateRepository.GenerateOtp(request.Email);
+            if (otp == null)
+                return BadRequest("User not found.");
+
+            _authenticateRepository.SendOtpEmail(request.Email, otp);
+            return Ok("OTP has been sent to your email.");
+        }
+
+        [HttpPost("VerifyOtp")]
+        public ActionResult VerifyOtp([FromBody] VerifyOtpRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Otp))
+                return BadRequest("Email and OTP are required.");
+
+            var isValid = _authenticateRepository.VerifyOtp(request.Email, request.Otp);
+            if (!isValid)
+                return BadRequest("Invalid or expired OTP.");
+
+            return Ok("OTP verified successfully.");
+        }
+
+        [HttpPost("ResetPassword")]
+        public ActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.NewPassword) || string.IsNullOrEmpty(request.ConfirmPassword))
+                return BadRequest("Email, new password, and confirmation password are required.");
+
+            if (request.NewPassword != request.ConfirmPassword)
+                return BadRequest("New password and confirmation password do not match.");
+
+            var result = _authenticateRepository.ResetPassword(request.Email, request.NewPassword);
+            if (!result)
+                return BadRequest("Failed to reset password. User may not exist.");
+
+            return Ok("Password reset successfully.");
         }
     }
 }
